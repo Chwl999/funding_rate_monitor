@@ -4,6 +4,6 @@
     "push_interval": 300,
     "thresholds": {
       "min_positive_apr": 50,
-      "min_negative_apr": -50
+      "min_negative_apr": -1000
     }
   }

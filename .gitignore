@@ -48,3 +48,4 @@ coverage/
 
 # 忽略 lock 文件（可选，根据团队协作决定）
 # package-lock.json
+*.md

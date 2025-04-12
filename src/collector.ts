@@ -5,7 +5,7 @@ import { logger } from './utils';
 interface FundingRate {
   rate: number;
   apr: number;
-  dailyApr: number; // 新增日化收益率
+  dailyApr: number;
   timestamp: Date;
 }
 
@@ -28,7 +28,7 @@ export class FundingRateCollector {
     this.fundingRates[exchange][symbol] = {
       rate,
       apr,
-      dailyApr, // 存储日化收益率
+      dailyApr,
       timestamp: new Date(),
     };
     logger.info(
@@ -37,7 +37,7 @@ export class FundingRateCollector {
   }
 
   getArbitragePairs(): string {
-    const positivePairs: [string, string, number, number][] = []; // 添加 dailyApr
+    const positivePairs: [string, string, number, number][] = [];
     const negativePairs: [string, string, number, number][] = [];
 
     for (const exchangeName in this.fundingRates) {
@@ -50,16 +50,23 @@ export class FundingRateCollector {
       }
     }
 
-    positivePairs.sort((a, b) => b[2] - a[2]); // 按年化收益率排序
+    positivePairs.sort((a, b) => b[2] - a[2]);
     negativePairs.sort((a, b) => a[2] - b[2]);
+
+    // 去除交易对后缀
+    const cleanSymbol = (symbol: string): string => {
+      return symbol
+        .replace(/(_USDT|USDT)$/, '')   // Binance: BTCUSDT -> BTC Gate: BTCUSDT -> BTC
+        .replace(/-USDT-SWAP$/, '');    // OKX: BTC-USDT-SWAP -> BTC
+    };
 
     let message = `资金费率更新 (${format(new Date(), 'yyyy-MM-dd HH:mm:ss')})\n\n`;
     message += `正向套利机会 (年化收益率 ≥ ${this.minPositiveApr}%):\n`;
     if (positivePairs.length) {
-      message += `交易所 | 交易对           | 年化收益率 | 日化收益率\n`;
+      message += `交易所 | 交易对 | 年化收益率 | 日化收益率\n`;
       message += positivePairs
         .map(([ex, sym, apr, dailyApr]) =>
-          `${ex.padEnd(10)} | ${sym.padEnd(15)} | ${apr.toFixed(2)}% | ${dailyApr.toFixed(2)}%`
+          `${ex.padEnd(10)} | ${cleanSymbol(sym).padEnd(7)} | ${apr.toFixed(2)}% | ${dailyApr.toFixed(2)}%`
         )
         .join('\n');
     } else {
@@ -68,10 +75,10 @@ export class FundingRateCollector {
 
     message += `\n反向套利机会 (年化收益率 ≤ ${this.minNegativeApr}%):\n`;
     if (negativePairs.length) {
-      message += `交易所 | 交易对           | 年化收益率 | 日化收益率\n`;
+      message += `交易所 | 交易对 | 年化收益率 | 日化收益率\n`;
       message += negativePairs
         .map(([ex, sym, apr, dailyApr]) =>
-          `${ex.padEnd(10)} | ${sym.padEnd(15)} | ${apr.toFixed(2)}% | ${dailyApr.toFixed(2)}%`
+          `${ex.padEnd(10)} | ${cleanSymbol(sym).padEnd(7)} | ${apr.toFixed(2)}% | ${dailyApr.toFixed(2)}%`
         )
         .join('\n');
     } else {
@@ -90,7 +97,7 @@ export class FundingRateCollector {
 }
 
 export function calculateRates(fundingRate: number): { apr: number; dailyApr: number } {
-  const dailyApr = fundingRate * 3 * 100; // 日化收益率：每天3次结算
-  const apr = dailyApr * 365; // 年化收益率
+  const dailyApr = fundingRate * 3 * 100;
+  const apr = dailyApr * 365;
   return { apr, dailyApr };
 }

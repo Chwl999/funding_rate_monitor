@@ -264,6 +264,7 @@ export async function sendTelegramMessage(message: string): Promise<void> {
       const response = await axios.post(url, {
         chat_id: TELEGRAM_CONFIG.chat_id,
         text: message,
+        // parse_mode: 'MarkdownV2', // 启用 MarkdownV2
       });
       if (response.status !== 200) {
         logger.error(`Telegram 推送失败: ${response.data}`);
@@ -274,3 +275,5 @@ export async function sendTelegramMessage(message: string): Promise<void> {
       logger.error(`Telegram 推送失败: ${error}`);
     }
   }
+
+  
