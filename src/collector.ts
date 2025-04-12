@@ -60,29 +60,27 @@ export class FundingRateCollector {
         .replace(/-USDT-SWAP$/, '');    // OKX: BTC-USDT-SWAP -> BTC
     };
 
-    let message = `资金费率更新 (${format(new Date(), 'yyyy-MM-dd HH:mm:ss')})\n\n`;
-    message += `正向套利机会 (年化收益率 ≥ ${this.minPositiveApr}%):\n`;
+    let message = `📊 **资金费率更新 (${format(new Date(), 'yyyy-MM-dd HH:mm:ss')})**\n\n`;
+    message += `🚀 **正向套利机会 (年化 ≥ ${this.minPositiveApr}%)**\n`;
     if (positivePairs.length) {
-      message += `交易所 | 交易对 | 年化收益率 | 日化收益率\n`;
       message += positivePairs
         .map(([ex, sym, apr, dailyApr]) =>
-          `${ex.padEnd(10)} | ${cleanSymbol(sym).padEnd(7)} | ${apr.toFixed(2)}% | ${dailyApr.toFixed(2)}%`
+          `${ex}, 交易对: ${cleanSymbol(sym)}, 年化: ${apr.toFixed(2)}%, 日化: ${dailyApr.toFixed(2)}%`
         )
         .join('\n');
     } else {
-      message += '无正向套利机会\n';
+      message += '  暂无显著正向套利机会\n';
     }
 
-    message += `\n反向套利机会 (年化收益率 ≤ ${this.minNegativeApr}%):\n`;
+    message += `\n\n📉 **反向套利机会 (年化 ≤ ${this.minNegativeApr}%)**\n`;
     if (negativePairs.length) {
-      message += `交易所 | 交易对 | 年化收益率 | 日化收益率\n`;
       message += negativePairs
         .map(([ex, sym, apr, dailyApr]) =>
-          `${ex.padEnd(10)} | ${cleanSymbol(sym).padEnd(7)} | ${apr.toFixed(2)}% | ${dailyApr.toFixed(2)}%`
+          `${ex}, 交易对: ${cleanSymbol(sym)}, 年化: ${apr.toFixed(2)}%, 日化: ${dailyApr.toFixed(2)}%`
         )
         .join('\n');
     } else {
-      message += '无反向套利机会\n';
+      message += '  暂无显著反向套利机会\n';
     }
 
     return message;
