@@ -32,3 +32,6 @@ export const TOP_PAIRS_COUNT: number = CONFIG.top_pairs_count;
 export const CACHE_DURATION: number = CONFIG.cache_duration;
 export const PUSH_INTERVAL: number = CONFIG.push_interval;
 export const CACHE_FILE: string = 'top_pairs_cache.json';
+
+// 交易手续费率 (%)，尝试从 config.json 读取，否则默认为 0.3%
+export const TRANSACTION_FEE_PERCENT: number = CONFIG.transaction_fee_percent ?? 0.3;

@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { CONFIG, EXCHANGES } from './config';
+import { CONFIG, EXCHANGES, TRANSACTION_FEE_PERCENT } from './config';
 import { logger } from './utils';
 
 interface FundingRate {
@@ -24,7 +24,7 @@ export class FundingRateCollector {
   }
 
   updateRate(exchange: string, symbol: string, rate: number): void {
-    const { apr, dailyApr } = calculateRates(rate);
+    const { apr, dailyApr } = calculateRates(rate, TRANSACTION_FEE_PERCENT);
     this.fundingRates[exchange][symbol] = {
       rate,
       apr,
@@ -94,8 +94,15 @@ export class FundingRateCollector {
   }
 }
 
-export function calculateRates(fundingRate: number): { apr: number; dailyApr: number } {
-  const dailyApr = fundingRate * 3 * 100;
-  const apr = dailyApr * 365;
-  return { apr, dailyApr };
+export function calculateRates(fundingRate: number, feePercent: number): { apr: number; dailyApr: number } {
+  const rawDailyApr = fundingRate * 3 * 100;
+  const rawApr = rawDailyApr * 365;
+
+  // 计算扣除一次性手续费后的净收益率
+  // 将手续费从年化中减去，并将分摊到每日的部分从日化中减去
+  const dailyFeeDeduction = feePercent / 365;
+  const netDailyApr = rawDailyApr - dailyFeeDeduction;
+  const netApr = rawApr - feePercent;
+
+  return { apr: netApr, dailyApr: netDailyApr };
 }

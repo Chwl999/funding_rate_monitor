@@ -5,5 +5,6 @@
     "thresholds": {
       "min_positive_apr": 50,
       "min_negative_apr": -50
-    }
+    },
+    "transaction_fee_percent":0.3
   }
