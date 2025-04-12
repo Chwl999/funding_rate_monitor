@@ -1,0 +1,28 @@
+{
+  "name": "funding_rate_monitor",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node src/index.ts",
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prod": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@types/ws": "^8.18.1",
+    "axios": "^1.8.4",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.5.0",
+    "pino": "^9.6.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "ws": "^8.18.1"
+  }
+}
+

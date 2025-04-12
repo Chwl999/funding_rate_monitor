@@ -1,0 +1,50 @@
+# Node.js 相关
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn.lock
+.pnpm-store/
+
+# 日志文件
+funding_rate_collector.log
+
+# 缓存文件
+top_pairs_cache.json
+
+# 构建输出
+dist/
+build/
+
+# 环境变量和敏感信息
+.env
+.env.local
+.env.*.local
+*.secret
+config.json.bak
+exchanges_config.json.bak
+
+# 编辑器和 IDE 文件
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# 测试和覆盖率报告
+coverage/
+.nyc_output/
+
+# 临时文件和备份
+*.bak
+*.tmp
+*.temp
+*~
+
+# 其他本地文件
+*.local
+
+# 忽略 lock 文件（可选，根据团队协作决定）
+# package-lock.json
