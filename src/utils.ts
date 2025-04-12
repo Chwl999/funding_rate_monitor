@@ -247,8 +247,8 @@ function parseFundingRate(exchangeName: string, data: any): [string | null, numb
       gate: (d) =>
         d.event === 'update' && d.result
           ? d.result
-              .filter((item: any) => item.contract && item.funding_rate != null)
-              .map((item: any) => [item.contract, parseFloat(item.funding_rate)])
+            .filter((item: any) => item.contract && item.funding_rate != null)
+            .map((item: any) => [item.contract, parseFloat(item.funding_rate)])
           : [],
     };
     return parsers[exchangeName]?.(data) || [];
@@ -259,21 +259,20 @@ function parseFundingRate(exchangeName: string, data: any): [string | null, numb
 }
 
 export async function sendTelegramMessage(message: string): Promise<void> {
-    const url = `https://api.telegram.org/bot${TELEGRAM_CONFIG.bot_token}/sendMessage`;
-    try {
-      const response = await axios.post(url, {
-        chat_id: TELEGRAM_CONFIG.chat_id,
-        text: message,
-        // parse_mode: 'MarkdownV2', // 启用 MarkdownV2
-      });
-      if (response.status !== 200) {
-        logger.error(`Telegram 推送失败: ${response.data}`);
-      } else {
-        logger.info('Telegram 消息推送成功');
-      }
-    } catch (error) {
-      logger.error(`Telegram 推送失败: ${error}`);
+  const url = `https://api.telegram.org/bot${TELEGRAM_CONFIG.bot_token}/sendMessage`;
+  try {
+    const response = await axios.post(url, {
+      chat_id: TELEGRAM_CONFIG.chat_id,
+      text: message,
+      // parse_mode: 'MarkdownV2', // 启用 MarkdownV2
+    });
+    if (response.status !== 200) {
+      logger.error(`Telegram 推送失败: ${response.data}`);
+    } else {
+      logger.info('Telegram 消息推送成功');
     }
+  } catch (error) {
+    logger.error(`Telegram 推送失败: ${error}`);
   }
+}
 
-  

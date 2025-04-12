@@ -31,9 +31,9 @@ export class FundingRateCollector {
       dailyApr,
       timestamp: new Date(),
     };
-    logger.info(
-      `更新 ${exchange} 的资金费率: ${symbol} -> ${rate} (APR: ${apr.toFixed(2)}%, Daily APR: ${dailyApr.toFixed(2)}%)`
-    );
+    // logger.info(
+    //   `更新 ${exchange} 的资金费率: ${symbol} -> ${rate} (APR: ${apr.toFixed(2)}%, Daily APR: ${dailyApr.toFixed(2)}%)`
+    // );
   }
 
   getArbitragePairs(): string {
