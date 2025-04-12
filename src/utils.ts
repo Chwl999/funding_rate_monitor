@@ -3,14 +3,19 @@ import WebSocket from 'ws';
 import * as fs from 'fs/promises';
 import { resolve } from 'path';
 import * as pino from 'pino';
-import { CONFIG, EXCHANGES, TELEGRAM_CONFIG, CACHE_FILE, CACHE_DURATION, TOP_PAIRS_COUNT } from './config';
+import { EXCHANGES, TELEGRAM_CONFIG, CACHE_FILE, CACHE_DURATION, TOP_PAIRS_COUNT } from './config';
 import { FundingRateCollector } from './collector';
 // 配置日志
 export const logger = pino.default({
   level: 'info',
   transport: {
-    target: 'pino/file',
-    options: { destination: 'funding_rate_monitor.log' },
+    target: 'pino-roll',
+    options: {
+      file: './funding_rate_monitor.log',
+      size: '5m',    // 每个日志文件最大 10MB
+      limit: { count: 5 }, // 保留 5 个历史文件
+      mkdir: true     // 自动创建日志目录
+    },
   },
 });
 
