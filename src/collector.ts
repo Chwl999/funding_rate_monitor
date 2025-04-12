@@ -3,9 +3,10 @@ import { CONFIG, EXCHANGES, TRANSACTION_FEE_PERCENT } from './config';
 import { logger } from './utils';
 
 interface FundingRate {
-  rate: number;
-  apr: number;
-  dailyApr: number;
+  rate: number; // 原始费率
+  apr: number; // 原始年化 (用于筛选)
+  singleCycleNetRatePercent: number; // 单次净收益率 (%)
+  dailyNetRatePercent: number; // 单日净收益率 (%)
   timestamp: Date;
 }
 
@@ -24,32 +25,35 @@ export class FundingRateCollector {
   }
 
   updateRate(exchange: string, symbol: string, rate: number): void {
-    const { apr, dailyApr } = calculateRates(rate, TRANSACTION_FEE_PERCENT);
+    const { apr, singleCycleNetRatePercent, dailyNetRatePercent } = calculateRates(rate, TRANSACTION_FEE_PERCENT);
     this.fundingRates[exchange][symbol] = {
       rate,
-      apr,
-      dailyApr,
+      apr, // 存储原始 APR
+      singleCycleNetRatePercent, // 存储单次净收益率
+      dailyNetRatePercent, // 存储单日净收益率
       timestamp: new Date(),
     };
     // logger.info(
-    //   `更新 ${exchange} 的资金费率: ${symbol} -> ${rate} (APR: ${apr.toFixed(2)}%, Daily APR: ${dailyApr.toFixed(2)}%)`
+    //   `更新 ${exchange} 的资金费率: ${symbol} -> ${rate} (APR: ${apr.toFixed(2)}%, SingleNet: ${singleCycleNetRatePercent.toFixed(4)}%, DailyNet: ${dailyNetRatePercent.toFixed(4)}%)`
     // );
   }
 
   getArbitragePairs(): string {
-    const positivePairs: [string, string, number, number][] = [];
-    const negativePairs: [string, string, number, number][] = [];
+    const positivePairs: [string, string, number, number, number][] = []; // [exchange, symbol, apr, singleCycleNetRate, dailyNetRate]
+    const negativePairs: [string, string, number, number, number][] = []; // [exchange, symbol, apr, singleCycleNetRate, dailyNetRate]
 
     for (const exchangeName in this.fundingRates) {
       for (const [symbol, rateData] of Object.entries(this.fundingRates[exchangeName])) {
+        // 筛选仍然基于原始 APR
         if (rateData.apr >= this.minPositiveApr) {
-          positivePairs.push([exchangeName, symbol, rateData.apr, rateData.dailyApr]);
+          positivePairs.push([exchangeName, symbol, rateData.apr, rateData.singleCycleNetRatePercent, rateData.dailyNetRatePercent]);
         } else if (rateData.apr <= this.minNegativeApr) {
-          negativePairs.push([exchangeName, symbol, rateData.apr, rateData.dailyApr]);
+          negativePairs.push([exchangeName, symbol, rateData.apr, rateData.singleCycleNetRatePercent, rateData.dailyNetRatePercent]);
         }
       }
     }
 
+    // 排序依据仍然是原始 APR
     positivePairs.sort((a, b) => b[2] - a[2]);
     negativePairs.sort((a, b) => a[2] - b[2]);
 
@@ -64,8 +68,8 @@ export class FundingRateCollector {
     message += `🚀 **正向套利机会 (年化 ≥ ${this.minPositiveApr}%)**\n`;
     if (positivePairs.length) {
       message += positivePairs
-        .map(([ex, sym, apr, dailyApr]) =>
-          `${ex}, 交易对: ${cleanSymbol(sym)}, 年化: ${apr.toFixed(2)}%, 日化: ${dailyApr.toFixed(2)}%`
+        .map(([ex, sym, _apr, singleCycleNetRate, dailyNetRate]) =>
+          `- ${ex} | ${cleanSymbol(sym)} | 单次: ${singleCycleNetRate.toFixed(4)}% | 单日: ${dailyNetRate.toFixed(4)}%`
         )
         .join('\n');
     } else {
@@ -75,8 +79,8 @@ export class FundingRateCollector {
     message += `\n\n📉 **反向套利机会 (年化 ≤ ${this.minNegativeApr}%)**\n`;
     if (negativePairs.length) {
       message += negativePairs
-        .map(([ex, sym, apr, dailyApr]) =>
-          `${ex}, 交易对: ${cleanSymbol(sym)}, 年化: ${apr.toFixed(2)}%, 日化: ${dailyApr.toFixed(2)}%`
+        .map(([ex, sym, _apr, singleCycleNetRate, dailyNetRate]) =>
+          `- ${ex} | ${cleanSymbol(sym)} | 单次: ${singleCycleNetRate.toFixed(4)}% | 单日: ${dailyNetRate.toFixed(4)}%`
         )
         .join('\n');
     } else {
@@ -94,15 +98,25 @@ export class FundingRateCollector {
   }
 }
 
-export function calculateRates(fundingRate: number, feePercent: number): { apr: number; dailyApr: number } {
-  const rawDailyApr = fundingRate * 3 * 100;
-  const rawApr = rawDailyApr * 365;
+// 计算原始年化(筛选用), 单次净收益率(显示用), 单日净收益率(显示用)
+export function calculateRates(fundingRate: number, feePercent: number): { apr: number; singleCycleNetRatePercent: number; dailyNetRatePercent: number } {
+  // 1. 计算原始 APR (用于筛选)
+  const rawApr = fundingRate * 3 * 365 * 100;
 
-  // 计算扣除一次性手续费后的净收益率
-  // 将手续费从年化中减去，并将分摊到每日的部分从日化中减去
-  const dailyFeeDeduction = feePercent / 365;
-  const netDailyApr = rawDailyApr - dailyFeeDeduction;
-  const netApr = rawApr - feePercent;
+  // 2. 计算单次净收益率 (显示用, %)
+  const fundingRatePercent = fundingRate * 100;
+  const singleCycleNetRatePercent = fundingRatePercent - feePercent;
 
-  return { apr: netApr, dailyApr: netDailyApr };
+  // 3. 计算单日净收益率 (显示用, %)
+  const dailyFundingRatePercent = fundingRate * 3 * 100;
+  let dailyNetRatePercent: number;
+  if (fundingRate >= 0) {
+    // 正向: 每日费率 - 总手续费
+    dailyNetRatePercent = dailyFundingRatePercent - feePercent;
+  } else {
+    // 反向: 每日费率 + 总手续费 (按用户要求)
+    dailyNetRatePercent = dailyFundingRatePercent + feePercent;
+  }
+
+  return { apr: rawApr, singleCycleNetRatePercent, dailyNetRatePercent };
 }
