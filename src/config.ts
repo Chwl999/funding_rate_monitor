@@ -61,6 +61,9 @@ export const CACHE_DURATION: number = CONFIG.cache_duration;
 /** @const PUSH_INTERVAL 数据获取和推送的间隔时间 (秒) */
 export const PUSH_INTERVAL: number = CONFIG.push_interval;
 
+/** @const FILTER_NEGATIVE_DAILY_NET_RATE 是否过滤掉日净收益为负的套利机会 */
+export const FILTER_NEGATIVE_DAILY_NET_RATE: boolean = CONFIG.filter_negative_daily_net_rate ?? false;
+
 /** @const CACHE_FILE 交易对缓存文件的名称 */
 export const CACHE_FILE: string = 'top_pairs_cache.json';
 

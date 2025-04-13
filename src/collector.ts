@@ -44,6 +44,8 @@ export class FundingRateCollector {
   private minPositiveApr: number;
   // 从配置中读取的反向套利 APR 阈值 (%)
   private minNegativeApr: number;
+  // 从配置中读取的是否过滤负日净收益的开关
+  private filterNegativeDailyNetRate: boolean;
 
   /**
    * @constructor
@@ -60,6 +62,8 @@ export class FundingRateCollector {
     // 从全局 CONFIG 对象加载正负 APR 阈值
     this.minPositiveApr = CONFIG.thresholds.min_positive_apr;
     this.minNegativeApr = CONFIG.thresholds.min_negative_apr;
+    // 从全局 CONFIG 对象加载过滤开关
+    this.filterNegativeDailyNetRate = CONFIG.filter_negative_daily_net_rate;
   }
 
   /**
@@ -103,6 +107,11 @@ export class FundingRateCollector {
     // 遍历所有交易所的费率数据
     for (const exchangeName in this.fundingRates) {
       for (const [symbol, rateData] of Object.entries(this.fundingRates[exchangeName])) {
+        // 如果启用了过滤，并且日净收益率为负，则跳过
+        if (this.filterNegativeDailyNetRate && rateData.dailyNetRatePercent < 0) {
+          continue;
+        }
+
         // 筛选基于原始 APR (rateData.apr) 是否达到阈值
         if (rateData.apr >= this.minPositiveApr) {
           positivePairs.push([exchangeName, symbol, rateData.apr, rateData.singleCycleNetRatePercent, rateData.dailyNetRatePercent]);
@@ -282,39 +291,23 @@ export function calculateRates(fundingRate: number, feePercent: number): { apr: 
 
   // 2. 计算单次净收益率 (%)
   const fundingRatePercent = fundingRate * 100; // 将原始费率转为百分比
-  // 单次净收益 = 原始费率(%) - 单边手续费(%)
-  const singleCycleNetRatePercent = fundingRatePercent - feePercent;
+  let singleCycleNetRatePercent: number;
 
   // 3. 计算单日净收益率 (%)
   // 假设一天结算 3 次
   const dailyFundingRatePercent = fundingRate * 3 * 100;
   let dailyNetRatePercent: number;
   // 注意：计算日净收益时，手续费只扣除一次（或加上一次），因为建仓和平仓通常在不同天或更长时间跨度。
-  // 这里的计算逻辑可能需要根据实际策略调整，目前是按用户之前的要求处理。
+
   if (fundingRate >= 0) {
-    // 正向费率：赚取费率，支付手续费
+    // 正向套利：赚取费率，支付手续费
+    singleCycleNetRatePercent = fundingRatePercent - feePercent;
     dailyNetRatePercent = dailyFundingRatePercent - feePercent;
   } else {
-    // 反向费率：支付费率，但反向操作时可以视为"赚取"了负费率，同时支付手续费
-    // 如果是套保或对冲策略，可能仍需支付手续费。但若理解为"通过支付负费率获利"，则加上手续费？
-    // 当前逻辑： 每日"收益"(负费率的绝对值) - 手续费。 (dailyFundingRatePercent 本身是负数)
-    // 或者按照之前的理解：对于负费率，净收益是 负费率绝对值 - 手续费？ (-fundingRate*3*100 - feePercent)
-    // **当前实现基于之前的注释 "反向: 每日费率 + 总手续费 (按用户要求)" -> dailyNetRatePercent = dailyFundingRatePercent + feePercent; **
-    // 这表示，如果费率是 -0.03%，手续费 0.06%，日费率是 -0.09%，日净收益是 -0.09% + 0.06% = -0.03%？ 这似乎不太对。
-    // **修正理解：** 对于收取负费率(做多支付)，日净收益应为 每日总费率(负) - 手续费。 对于支付负费率(做空收取)，日净收益应为 每日总费率(正) - 手续费。
-    // 因此，统一计算：日净收益 = abs(每日总费率) - 手续费？ 也不完全对。
-    // **保持现有计算方式，但添加注释说明其含义：**
-    // 当前计算：将负费率视为成本，手续费是额外成本，所以总成本是 |每日费率| + 手续费。净收益是 -(|每日费率| + 手续费)?
-    // 不对，之前的 `+ feePercent` 可能是指做空时，收到负费率，这个"收入"需要减去手续费。
-    // 让我们重新审视： dailyFundingRatePercent 是负数。
-    // 如果 dailyFundingRatePercent = -0.09%, feePercent = 0.06%
-    // dailyNetRatePercent = -0.09% + 0.06% = -0.03%. 这意味着做多需要支付的总成本(费率+手续费)对应的收益率？
-    // 还是应该理解为：日净收益 = - (需要支付的日费率绝对值 + 手续费)？ = -(0.09 + 0.06) = -0.15% ?
-    // **暂时维持原代码逻辑 `dailyNetRatePercent = dailyFundingRatePercent + feePercent;` 并添加注释指出其可能需要根据具体策略复核。**
-    // 假设策略是收取负费率(做空)：收取的费率 = -dailyFundingRatePercent。净收益 = (-dailyFundingRatePercent) - feePercent。
-    // 假设策略是支付负费率(做多)：支付的费率 = dailyFundingRatePercent。净损失 = dailyFundingRatePercent - feePercent。
-    // 当前实现似乎混合了概念。 **暂时维持现状，但强烈建议复核此处的计算逻辑。**
-    dailyNetRatePercent = dailyFundingRatePercent + feePercent; // 存疑的计算方式，按用户先前要求保留
+    // 反向套利：收取负费率（等同于盈利），支付手续费
+    // 净收益 = 收取的费率绝对值 - 单边手续费
+    singleCycleNetRatePercent = Math.abs(fundingRatePercent) - feePercent;
+    dailyNetRatePercent = Math.abs(dailyFundingRatePercent) - feePercent;
   }
 
   return { apr: rawApr, singleCycleNetRatePercent, dailyNetRatePercent };
