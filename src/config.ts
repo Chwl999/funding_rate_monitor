@@ -75,3 +75,6 @@ export const CACHE_FILE: string = 'top_pairs_cache.json';
  * 使用空值合并运算符 (`??`) 来提供默认值。
  */
 export const TRANSACTION_FEE_PERCENT: number = CONFIG.transaction_fee_percent ?? 0.3;
+
+/** @const TIMESTAMPS_CACHE_FILE 时间戳缓存文件的名称 */
+export const TIMESTAMPS_CACHE_FILE: string = 'timestamps_cache.json';

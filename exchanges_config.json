@@ -21,13 +21,13 @@
     },
     "bitget": {
       "ws_url": "wss://ws.bitget.com/v2/ws/public",
-      "rest_url_funding": "https://api.bitget.com/api/v2/mix/market/tickers?productType=USDT-FUTURES",
+      "rest_url_funding": "https://api.bitget.com/api/v2/mix/market/current-fund-rate",
       "symbol_key": "symbol",
       "filter_suffix": "USDT"
     },
     "gate": {
       "ws_url": "wss://fx-ws.gateio.ws/v4/ws/usdt",
-      "rest_url_funding": "https://api.gateio.ws/api/v4/futures/usdt/tickers",
+      "rest_url_funding": "https://api.gateio.ws/api/v4/futures/usdt/contracts",
       "symbol_key": "contract",
       "filter_suffix": "_USDT"
     }

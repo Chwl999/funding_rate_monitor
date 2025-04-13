@@ -46,6 +46,12 @@ async function main(): Promise<void> {
       collector.clear(); // 清空上一轮收集的费率数据
       await fetchFundingRates(collector, topPairs); // 调用工具函数，获取 topPairs 的资金费率，并存入 collector
 
+      // ----------- 2.5 保存更新的时间戳 (如果需要) ----------- //
+      if (collector.timestampsChanged) {
+        await collector.saveTimestampsCache(); // 异步保存缓存
+        collector.timestampsChanged = false; // 重置标志
+      }
+
       // ----------- 3. 推送常规套利机会消息 ----------- //
       // 从 collector 获取格式化后的高正/负费率套利机会消息
       const message = collector.getArbitragePairs();

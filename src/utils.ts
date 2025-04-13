@@ -124,6 +124,8 @@ export async function fetchTopLiquidityPairs(): Promise<string[]> {
   }
 }
 
+const API_REQUEST_DELAY_MS = 150; // Introduce a delay constant (e.g., 150ms)
+
 /**
  * @function fetchFundingRates
  * @description 获取指定交易对列表在所有已配置交易所的资金费率。
@@ -158,25 +160,69 @@ export async function fetchFundingRates(collector: FundingRateCollector, pairs: 
               const item = response.data?.data?.[0]; // 安全访问嵌套属性
               if (item && item.fundingRate != null) {
                 // 使用 collector 更新费率，注意传回原始的交易对名称 (pair)
-                collector.updateRate(exchangeName, item.instId, parseFloat(item.fundingRate));
+                const nextFundingTimestamp = item.nextFundingTime ? parseInt(item.nextFundingTime, 10) : null;
+                collector.updateRate(exchangeName, item.instId, parseFloat(item.fundingRate), nextFundingTimestamp);
                 ratesFetched = true;
               }
             } catch (pairError) {
                logger.warn(`获取 ${exchangeName} ${pair} 费率失败 (REST): ${pairError}`);
+            } finally {
+              // Add delay after each request for rate-limited endpoints
+              await new Promise(resolve => setTimeout(resolve, API_REQUEST_DELAY_MS));
+            }
+          }
+        } else if (exchangeName === 'bitget') {
+          for (const pair of adjustedPairs) {
+            try {
+              // Construct the full URL with query parameters
+              const url = `${config.rest_url_funding}?symbol=${pair}&productType=usdt-futures`;
+              const response = await axios.get(url, { timeout: 5000 });
+              // Bitget new endpoint response structure: { data: [{ symbol: '...', fundingRate: '...', nextUpdate: '...' }] }
+              const item = response.data?.data?.[0];
+              if (item && item.fundingRate != null) {
+                const nextFundingTimestamp = item.nextUpdate ? parseInt(item.nextUpdate, 10) : null;
+                collector.updateRate(exchangeName, item.symbol, parseFloat(item.fundingRate), nextFundingTimestamp);
+                ratesFetched = true;
+              }
+            } catch (pairError) {
+              logger.warn(`获取 ${exchangeName} ${pair} 费率失败 (REST): ${pairError}`);
+            } finally {
+              // Add delay after each request for rate-limited endpoints
+              await new Promise(resolve => setTimeout(resolve, API_REQUEST_DELAY_MS));
+            }
+          }
+        } else if (exchangeName === 'gate') {
+          for (const pair of adjustedPairs) {
+            try {
+              // Construct the full URL by appending the contract name
+              const url = `${config.rest_url_funding}/${pair}`;
+              const response = await axios.get(url, { timeout: 5000 });
+              // Gate new endpoint response structure: { name: '...', funding_rate: '...', funding_next_apply: ... }
+              const item = response.data;
+              if (item && item.funding_rate != null) {
+                const nextFundingTimestamp = item.funding_next_apply ? item.funding_next_apply * 1000 : null;
+                collector.updateRate(exchangeName, item.name, parseFloat(item.funding_rate), nextFundingTimestamp);
+                ratesFetched = true;
+              }
+            } catch (pairError) {
+              logger.warn(`获取 ${exchangeName} ${pair} 费率失败 (REST): ${pairError}`);
+            } finally {
+              // Add delay after each request for rate-limited endpoints
+              await new Promise(resolve => setTimeout(resolve, API_REQUEST_DELAY_MS));
             }
           }
         } else {
-          // 对于其他交易所，通常一个请求可以获取多个或所有交易对的费率
-          const response = await axios.get(config.rest_url_funding, { timeout: 5000 });
+          // Original logic for other exchanges (e.g., Binance, Bybit) that fetch all tickers at once
+          const response = await axios.get(config.rest_url_funding!, { timeout: 5000 }); // Assuming rest_url_funding exists for others
           const data = response.data;
 
           // --- 根据不同交易所的 API 响应结构解析数据 --- //
           if (exchangeName === 'binance') {
             if (Array.isArray(data)) {
               for (const item of data) {
-                // 检查交易对是否在我们关心的列表中，并且费率存在
                 if (adjustedPairs.includes(item.symbol) && item.lastFundingRate != null) {
-                  collector.updateRate(exchangeName, item.symbol, parseFloat(item.lastFundingRate));
+                  const nextFundingTimestamp = item.nextFundingTime ? parseInt(item.nextFundingTime, 10) : null;
+                  collector.updateRate(exchangeName, item.symbol, parseFloat(item.lastFundingRate), nextFundingTimestamp);
                   ratesFetched = true;
                 }
               }
@@ -187,34 +233,13 @@ export async function fetchFundingRates(collector: FundingRateCollector, pairs: 
             if (data?.result?.list && Array.isArray(data.result.list)) {
               for (const item of data.result.list) {
                 if (adjustedPairs.includes(item.symbol) && item.fundingRate != null) {
-                  collector.updateRate(exchangeName, item.symbol, parseFloat(item.fundingRate));
+                  const nextFundingTimestamp = item.nextFundingTime ? parseInt(item.nextFundingTime, 10) : null;
+                  collector.updateRate(exchangeName, item.symbol, parseFloat(item.fundingRate), nextFundingTimestamp);
                   ratesFetched = true;
                 }
               }
             } else {
               logger.warn(`${exchangeName} REST 响应格式非预期: ${JSON.stringify(data)}`);
-            }
-          } else if (exchangeName === 'bitget') {
-             if (data?.data && Array.isArray(data.data)) {
-                for (const item of data.data) {
-                  if (adjustedPairs.includes(item.symbol) && item.fundingRate != null) {
-                    collector.updateRate(exchangeName, item.symbol, parseFloat(item.fundingRate));
-                    ratesFetched = true;
-                  }
-                }
-            } else {
-              logger.warn(`${exchangeName} REST 响应格式非预期: ${JSON.stringify(data)}`);
-            }
-          } else if (exchangeName === 'gate') {
-            if (Array.isArray(data)) {
-              for (const item of data) {
-                if (adjustedPairs.includes(item.contract) && item.funding_rate != null) {
-                  collector.updateRate(exchangeName, item.contract, parseFloat(item.funding_rate));
-                  ratesFetched = true;
-                }
-              }
-            } else {
-              logger.warn(`${exchangeName} REST 响应格式非预期数组: ${JSON.stringify(data)}`);
             }
           }
           // --- 解析结束 --- //
@@ -306,10 +331,9 @@ async function fetchFundingRatesViaWebSocket(
         for (const [symbol, rate] of rates) {
           // 检查数据是否有效，且是我们订阅的交易对
           if (symbol && rate != null && pairs.includes(symbol)) {
-            // 使用 collector 更新费率
-            collector.updateRate(exchangeName, symbol, rate);
+            // 使用 collector 更新费率 - WebSocket 暂不传递时间戳
+            collector.updateRate(exchangeName, symbol, rate, null);
             dataReceived = true; // 标记已收到有效数据
-            // logger.debug(`${exchangeName} 收到资金费率 (WebSocket): ${symbol} -> ${rate}`); // 使用 debug 级别避免过多日志
           }
         }
       } catch (error) {
